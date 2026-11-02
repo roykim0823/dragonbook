@@ -1,0 +1,4 @@
+Exercise 11.3.1 (unit-stride rewrites)
+  (a) i=10..49 step 7  vs  j=0..5, i=7j+10     same
+  (b) i=-3..10 step 2  vs  j=0..6, i=2j-3      same
+  (c) i=50 down to 10  vs  j=0..40, i=50-j     same

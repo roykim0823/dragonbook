@@ -1,0 +1,20 @@
+Example 11.12: project away i (verbose)
+  eliminating i: 1 lower bound(s), 2 upper bound(s) -> at most 2 new rows
+    (i >= 0)  x  (-i + 5 >= 0)  =>  5 >= 0   [always true, dropped]
+    (i >= 0)  x  (-i + j >= 0)  =>  j >= 0
+  result  (vars: i j )
+    -j + 7 >= 0
+    j >= 0
+
+per-j check: which j have an integer i in S, and does S' admit exactly those?
+  j = -1:  no integer i            S' admits j: no    OK
+  j =  0:  i in 0..0  (1 value)    S' admits j: yes   OK
+  j =  1:  i in 0..1  (2 values)   S' admits j: yes   OK
+  j =  2:  i in 0..2  (3 values)   S' admits j: yes   OK
+  j =  3:  i in 0..3  (4 values)   S' admits j: yes   OK
+  j =  4:  i in 0..4  (5 values)   S' admits j: yes   OK
+  j =  5:  i in 0..5  (6 values)   S' admits j: yes   OK
+  j =  6:  i in 0..5  (6 values)   S' admits j: yes   OK
+  j =  7:  i in 0..5  (6 values)   S' admits j: yes   OK
+  j =  8:  no integer i            S' admits j: no    OK
+  verify: S' admits exactly the j that have some i: IDENTICAL

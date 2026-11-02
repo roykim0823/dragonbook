@@ -1,0 +1,8 @@
+Example 11.8: B i + b >= 0 for Fig. 11.10  (vars: i j )
+    i >= 0
+    -i + 5 >= 0
+    -i + j >= 0
+    -j + 7 >= 0
+Fig. 11.10 original nest: 33 iterations
+integer points of the polyhedron (brute force): 33  == loop nest
+box check: [-2,12]^2 gives 33, [-20,30]^2 gives 33  (same: the box is big enough)

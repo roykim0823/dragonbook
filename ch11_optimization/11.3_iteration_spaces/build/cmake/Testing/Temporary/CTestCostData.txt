@@ -1,0 +1,18 @@
+01_example_11_5_unit_stride 2 0.00132219
+02_example_11_8_matrix_form 2 0.00106488
+03_example_11_9_symbolic_constant 2 0.0014474
+04_example_11_12_eliminate_i 2 0.0012325
+05_example_11_14_reorder_j_i 2 0.00117725
+06_example_11_15_change_axes 2 0.00102042
+07_exercise_11_3_1_unit_stride 2 0.00107185
+08_exercise_11_3_2_iteration_spaces 2 0.0319351
+09_exercise_11_3_3_matrix_form 2 0.00143873
+10_exercise_11_3_4_reverse_order 2 0.0792341
+11_exercise_11_3_5_eliminate_i 2 0.00139538
+12_exercise_11_3_6_eliminate_j 2 0.00120742
+13_exercise_11_3_7_diagonal_axis 2 0.0463205
+14_exercise_11_3_8a_antidiagonal_axis 2 0.0455388
+15_exercise_11_3_8b_non_unimodular_axis 2 0.085892
+16_exercise_11_3_9_stride_formula 2 0.00152637
+90_fm_fuzz 2 0.141789
+---

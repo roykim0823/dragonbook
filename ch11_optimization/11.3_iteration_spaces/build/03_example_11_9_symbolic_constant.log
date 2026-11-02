@@ -1,0 +1,13 @@
+Example 11.9: symbolic constant n is just another column  (vars: n i )
+    i >= 0
+    n - i >= 0
+
+---- n = -10 ----
+  guard n >= 0: FALSE
+  for (i = 0; i <= n; i++) with n = -10: 0 iterations
+  integer points with n = -10 (brute force): 0  == loop
+
+---- n = 10 ----
+  guard n >= 0: true
+  for (i = 0; i <= n; i++) with n = 10: 11 iterations
+  integer points with n = 10 (brute force): 11  == loop

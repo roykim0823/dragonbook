@@ -1,0 +1,18 @@
+Exercise 11.3.3: rows of B x + b >= 0 ('<' bounds written as '<=' by subtracting 1)
+(a)  (vars: i j )
+    i - 1 >= 0
+    -i + 29 >= 0
+    -i + j - 2 >= 0
+    -i - j + 39 >= 0
+(b)  (vars: i j )
+    i - 10 >= 0
+    -i + 1000 >= 0
+    -i + j >= 0
+    i - j + 9 >= 0
+(c)  (vars: i j k )
+    i >= 0
+    -i + 99 >= 0
+    j >= 0
+    i - j + 99 >= 0
+    -i - j + k >= 0
+    -i - j - k + 99 >= 0
