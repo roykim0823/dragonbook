@@ -18,8 +18,9 @@ template <class A, class B> inline std::common_type_t<A, B> floorDiv(A a, B b) {
   T q = x / y; // quotient truncated toward zero
   T r = x % y; // remainder; it is 0 exactly when the division is exact
   // Truncating and flooring only differ when the division is inexact AND the
-  // exact quotient is negative (x and y have opposite signs). In that case the
-  // truncated quotient is one too large.
+  // exact quotient is negative, i.e. x and y have opposite signs. In C++ the
+  // remainder r has the sign of x, so that is the test on r below. In that
+  // case the truncated quotient is one too large.
   bool inexact = (r != 0);
   bool negativeQuotient = (r < 0) != (y < 0);
   if (inexact && negativeQuotient)

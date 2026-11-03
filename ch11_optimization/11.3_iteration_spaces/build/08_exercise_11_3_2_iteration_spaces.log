@@ -1,4 +1,0 @@
-Fig. 11.17(a): for i=1..29 / for j=i+2..39-i          342 iterations (i actually only reaches 18)
-Fig. 11.17(b): for i=10..1000 / for j=i..i+9           9910 iterations
-Fig. 11.17(c): for i / for j / for k=i+j..99-i-j       44200 iterations (i,j really only reach 49)
-polyhedron point counts (brute force): (a) 342  (b) 9910  (c) 44200   == loop nests

@@ -13,45 +13,39 @@ int main() {
   // '<=' by subtracting 1).
   Polyhedron nestA; // (a) for (i=1;i<30;i++) for (j=i+2;j<40-i;j++)
   nestA.vars = {"i", "j"};
-  nestA.ge0({{"i", 1}}, -1)
-      .ge0({{"i", -1}}, 29)             //  1 <= i <= 29
-      .ge0({{"j", 1}, {"i", -1}}, -2)   //  j - i - 2 >= 0   j >= i + 2
-      .ge0({{"j", -1}, {"i", -1}}, 39); // -j - i + 39 >= 0  j <= 39 - i
+  nestA.addInequality({{"i", 1}}, -1)
+      .addInequality({{"i", -1}}, 29)             //  1 <= i <= 29
+      .addInequality({{"j", 1}, {"i", -1}}, -2)   // j >= i + 2
+      .addInequality({{"j", -1}, {"i", -1}}, 39); // j <= 39 - i
   Polyhedron nestB; // (b) for (i=10;i<=1000;i++) for (j=i;j<i+10;j++)
   nestB.vars = {"i", "j"};
-  nestB.ge0({{"i", 1}}, -10)
-      .ge0({{"i", -1}}, 1000)         // 10 <= i <= 1000
-      .ge0({{"j", 1}, {"i", -1}}, 0)  //  j - i >= 0      j >= i
-      .ge0({{"j", -1}, {"i", 1}}, 9); // -j + i + 9 >= 0  j <= i + 9
+  nestB.addInequality({{"i", 1}}, -10)
+      .addInequality({{"i", -1}}, 1000)         // 10 <= i <= 1000
+      .addInequality({{"j", 1}, {"i", -1}}, 0)  //  j - i >= 0      j >= i
+      .addInequality({{"j", -1}, {"i", 1}}, 9); // -j + i + 9 >= 0  j <= i + 9
   Polyhedron nestC; // (c) for (i=0;i<100;i++) for (j=0;j<100+i;j++)
                     //     for (k=i+j;k<100-i-j;k++)
   nestC.vars = {"i", "j", "k"};
-  nestC.ge0({{"i", 1}}, 0)
-      .ge0({{"i", -1}}, 99) // 0 <= i <= 99
-      .ge0({{"j", 1}}, 0)
-      .ge0({{"j", -1}, {"i", 1}}, 99)              // 0 <= j <= 99 + i
-      .ge0({{"k", 1}, {"i", -1}, {"j", -1}}, 0)    // k >= i + j
-      .ge0({{"k", -1}, {"i", -1}, {"j", -1}}, 99); // k <= 99 - i - j
+  nestC.addInequality({{"i", 1}}, 0)
+      .addInequality({{"i", -1}}, 99) // 0 <= i <= 99
+      .addInequality({{"j", 1}}, 0)
+      .addInequality({{"j", -1}, {"i", 1}}, 99)              // 0 <= j <= 99 + i
+      .addInequality({{"k", 1}, {"i", -1}, {"j", -1}}, 0)    // k >= i + j
+      .addInequality({{"k", -1}, {"i", -1}, {"j", -1}}, 99); // k <= 99 - i - j
   // brute-force boxes that contain each polyhedron (see program 02: any
   // containing box gives the same point set)
   const int64_t loA = -5, hiA = 60, loB = 0, hiB = 1020, loC = -5, hiC = 210;
-  const Matrix identity2{{1, 0}, {0, 1}}; // identity: a pure reorder
-  const Matrix identity3{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-  const std::vector<int64_t> zero2{0, 0}, zero3{0, 0, 0};
-  // experiment(title, poly, newVars, transform, offset, loopOrder, boxLo,
-  // boxHi,
-  //            body, verbose): newVars == poly.vars means a pure reorder
-  experiment("(a) original order i,j", nestA, nestA.vars, identity2, zero2,
-             {"i", "j"}, loA, hiA, "X[i][j] = 0;", false);
-  experiment("(a) reversed order j,i", nestA, nestA.vars, identity2, zero2,
-             {"j", "i"}, loA, hiA, "X[i][j] = 0;", true);
-  experiment("(b) reversed order j,i", nestB, nestB.vars, identity2, zero2,
-             {"j", "i"}, loB, hiB, "X[i][j] = 0;", false);
-  experiment("(c) original order i,j,k (note the tightened bounds)", nestC,
-             nestC.vars, identity3, zero3, {"i", "j", "k"}, loC, hiC,
-             "X[i][j][k] = 0;", false);
-  experiment("(c) reversed order k,j,i", nestC, nestC.vars, identity3, zero3,
-             {"k", "j", "i"}, loC, hiC, "X[i][j][k] = 0;", true);
+  // reorder(title, poly, loopOrder, boxLo, boxHi, body, verbose)
+  reorder("(a) original order i,j", nestA, {"i", "j"}, loA, hiA, "X[i][j] = 0;",
+          false);
+  reorder("(a) reversed order j,i", nestA, {"j", "i"}, loA, hiA, "X[i][j] = 0;",
+          true);
+  reorder("(b) reversed order j,i", nestB, {"j", "i"}, loB, hiB, "X[i][j] = 0;",
+          false);
+  reorder("(c) original order i,j,k (note the tightened bounds)", nestC,
+          {"i", "j", "k"}, loC, hiC, "X[i][j][k] = 0;", false);
+  reorder("(c) reversed order k,j,i", nestC, {"k", "j", "i"}, loC, hiC,
+          "X[i][j][k] = 0;", true);
 
   // the points the original nests visit, for the plain-loop checks below
   std::set<IJ> refA, refB;

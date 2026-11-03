@@ -7,17 +7,23 @@
 //
 //   ./run.sh 3      or      g++ -std=c++17 -O2 -Wall -Wextra -I code/include -o
 //   ex03 code/src/03_example_11_9_symbolic_constant.cpp && ./ex03
-#include "verify.h"
+#include "enumerate.h"
 
 int main() {
   Polyhedron poly; // Example 11.9:  for (i = 0; i <= n; i++)
   poly.vars = {"n", "i"};
-  poly.ge0({{"i", 1}}, 0)             //  i     >= 0     i >= 0
-      .ge0({{"n", 1}, {"i", -1}}, 0); //  n - i >= 0     i <= n
+  poly.addInequality({{"i", 1}}, 0)             //  i     >= 0     i >= 0
+      .addInequality({{"n", 1}, {"i", -1}}, 0); //  n - i >= 0     i <= n
   printRows(poly, "Example 11.9: symbolic constant n is just another column");
 
-  // Brute force over (n, i): every pair in the box that satisfies both rows.
-  // The box only has to contain the n values tried below and i = 0..10.
+  // Brute force over (n, i). enumerateBox uses the same lo..hi for every
+  // column, so the box is the square [-20, 20]^2: n from -20 to 20 and i from
+  // -20 to 20, 41 * 41 = 1681 candidate points, from the corner (-20, -20) to
+  // (20, 20). A candidate is kept only if both rows hold, so what comes back
+  // is the triangle 0 <= i <= n <= 20 (231 points), for every n at once. As in
+  // program 02 the box only has to CONTAIN the points asked about below, the
+  // n values -10 and 10 with i = 0..10; a bigger box would keep more points
+  // with n > 20 but change neither slice. Figure 03 in the guide draws it.
   std::set<Point> points = enumerateBox(poly, -20, 20);
 
   for (long value : {-10L, 10L}) {

@@ -95,6 +95,20 @@ inline void experiment(const std::string &title, const Polyhedron &poly,
   compare(title, enumerateBox(poly, lo, hi), visited);
 }
 
+// A pure reorder: the same variables, looped in a different order. This is
+// experiment() with the identity substitution (x = y), which is what programs
+// 05 and 10 do.
+inline void reorder(const std::string &title, const Polyhedron &poly,
+                    const std::vector<std::string> &order, int64_t lo,
+                    int64_t hi, const std::string &body, bool verbose) {
+  size_t d = poly.vars.size();
+  Matrix identity(d, std::vector<int64_t>(d, 0));
+  for (size_t k = 0; k < d; ++k)
+    identity[k][k] = 1;
+  experiment(title, poly, poly.vars, identity, std::vector<int64_t>(d, 0),
+             order, lo, hi, body, verbose);
+}
+
 // A change of axes that is NOT unimodular. Instead of substituting, keep the
 // old variables, add the new axis variable `newVar = sum coeff*old` as a first
 // column pinned down by an EQUALITY (written as two >= rows), and let

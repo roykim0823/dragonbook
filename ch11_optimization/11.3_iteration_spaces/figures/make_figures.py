@@ -91,7 +91,7 @@ def fig01():
     save(fig, "01_iteration_space.png")
 
 
-# ----------------------------------------------------------------------------- 02, 03, 08 sweeps
+# ----------------------------------------------------------------------------- 02, 04, 09 sweeps
 def sweep(order, title, name, xy):
     """order: points in visiting order; xy(p) -> plot coordinates (x, y) of point p."""
     fig, ax = plt.subplots(figsize=(7.2, 5.2))
@@ -114,22 +114,56 @@ def fig02():
           "02_sweep_original.png", lambda p: (p[1], p[0]))
 
 
-def fig03():
+def fig04():
     order = [(i, j) for j in range(0, 8) for i in range(0, min(5, j) + 1)]
     assert sorted(order) == sorted(P)
     sweep(order, "Column by column: j outer, i inner (Example 11.14)",
-          "03_sweep_column.png", lambda p: (p[1], p[0]))
+          "04_sweep_column.png", lambda p: (p[1], p[0]))
 
 
-def fig08():
+def fig09():
     order = [(j - k, j) for k in range(0, 8) for j in range(k, min(k + 5, 7) + 1)]
     assert sorted(order) == sorted(P)
     sweep(order, "Diagonal by diagonal: k = j − i outer, j inner (Example 11.15)",
-          "08_sweep_diagonal.png", lambda p: (p[1], p[0]))
+          "09_sweep_diagonal.png", lambda p: (p[1], p[0]))
 
 
-# ----------------------------------------------------------------------------- 04 projection
-def fig04():
+# ----------------------------------------------------------------------------- 03 enumerateBox
+def fig03():
+    """Program 03: what enumerateBox(poly, -20, 20) does for Example 11.9 over (n, i).
+    The box is the square [-20, 20]^2 (every candidate), the kept points are those where
+    both rows hold, i >= 0 and n - i >= 0: the triangle 0 <= i <= n <= 20. Fixing n is
+    taking one row of the picture: n = 10 holds 11 points, n = -10 none."""
+    LO, HI = -20, 20
+    box = [(n, i) for n in range(LO, HI + 1) for i in range(LO, HI + 1)]   # the box
+    kept = [(n, i) for n, i in box if i >= 0 and n - i >= 0]             # both rows hold
+    assert len(box) == 41 * 41 == 1681 and len(kept) == 231
+    assert sum(1 for n, i in kept if n == 10) == 11 and not any(n == -10 for n, i in kept)
+
+    fig, ax = plt.subplots(figsize=(7.6, 7.2))
+    ax.add_patch(Polygon([(LO - 0.5, LO - 0.5), (HI + 0.5, LO - 0.5), (HI + 0.5, HI + 0.5), (LO - 0.5, HI + 0.5)],
+                         closed=True, facecolor="none", edgecolor=GRAY, lw=1.5, ls="--", label="the box [−20, 20]²"))
+    ax.scatter([i for n, i in box], [n for n, i in box], s=6, color="#cfcfcf", zorder=2,
+               label="candidates tried (1681)")
+    ax.add_patch(Polygon([(0, 0), (0, HI), (HI, HI)], closed=True, facecolor=FILL, edgecolor="none", zorder=1))
+    ax.scatter([i for n, i in kept], [n for n, i in kept], s=18, color=BLUE, zorder=3,
+               label="kept: i ≥ 0 and n − i ≥ 0 (231)")
+    s10 = [(n, i) for n, i in kept if n == 10]
+    ax.scatter([i for n, i in s10], [n for n, i in s10], s=40, color=ORANGE, zorder=4,
+               label="slice n = 10: 11 points")
+    ax.plot([LO - 0.5, HI + 0.5], [-10, -10], color=RED, lw=2, ls=(0, (4, 2)), zorder=4,
+            label="slice n = −10: no points")
+    ax.plot([0, 0], [LO - 0.5, HI + 0.5], color=GREEN, lw=1.6, label="i = 0")
+    ax.plot([LO - 0.5, HI + 0.5], [LO - 0.5, HI + 0.5], color=PURPLE, lw=1.6, label="i = n")
+    ax.set_xlim(LO - 1.5, HI + 1.5); ax.set_ylim(LO - 1.5, HI + 1.5)
+    ax.set_xticks(range(LO, HI + 1, 5)); ax.set_yticks(range(LO, HI + 1, 5))
+    axes_ij(ax, "i (the loop index)", "n (the symbolic constant)")
+    ax.set_title("Program 03: enumerateBox(poly, −20, 20) over (n, i)\ntries every point of the box, keeps the triangle 0 ≤ i ≤ n")
+    ax.legend(loc="upper left", fontsize=8.5, framealpha=0.95)
+    save(fig, "03_enumerate_box.png")
+
+# ----------------------------------------------------------------------------- 05 projection
+def fig05():
     """Left: the question the outer loop asks, one column (fixed j) at a time: is the
     strip of i values  max(lower) <= i <= min(upper)  non-empty?  Right: the j values
     that pass are the projection (shadow) of the polyhedron on the j axis, and they are
@@ -164,11 +198,11 @@ def fig04():
     a2.scatter([-1, 8], [-1.2, -1.2], marker="x", s=80, color=RED, zorder=4)
     a2.text(3.5, -2.1, "shadow on the j axis:  0 ≤ j ≤ 7   =   for (j = 0; j <= 7; j++)", ha="center", fontsize=10, color=RED)
     a2.set_title("The j values that passed = the projection of the polyhedron on j\n(Fourier–Motzkin derives  0 ≤ j  and  j ≤ 7  without trying each j)", fontsize=10.5)
-    save(fig, "04_projection_shadow.png")
+    save(fig, "05_projection_shadow.png")
 
 
-# ----------------------------------------------------------------------------- 05 FM lower/upper
-def fig05():
+# ----------------------------------------------------------------------------- 06 FM lower/upper
+def fig06():
     fig, ax = plt.subplots(figsize=(8.2, 4.4))
     j = np.linspace(-1, 9, 400)
     lo = np.zeros_like(j)
@@ -183,11 +217,11 @@ def fig05():
     ax.set_ylabel("i (the variable we ELIMINATE)")
     ax.set_title("Eliminating i: an i exists  ⇔  every lower bound ≤ every upper bound")
     ax.legend(loc="upper right", fontsize=9, framealpha=0.95)
-    save(fig, "05_fm_lower_upper.png")
+    save(fig, "06_fm_lower_upper.png")
 
 
-# ----------------------------------------------------------------------------- 06 Pass 2
-def fig06():
+# ----------------------------------------------------------------------------- 07 Pass 2
+def fig07():
     """Pass 2 of Algorithm 11.13 asks, for every candidate bound: is there any value of the
     outer variables for which it is the binding one?  Example 11.14: both upper bounds of i
     touch the shape somewhere, both are kept."""
@@ -205,11 +239,11 @@ def fig06():
     axes_ij(a1, "i (inner)", "j (outer)")
     a1.set_title("Example 11.14: every bound of i is binding\nfor some j  ->  all kept", fontsize=10.5)
     a1.legend(loc="lower right", fontsize=8.5, framealpha=0.95)
-    save(fig, "06_pass2_all_kept.png")
+    save(fig, "07_pass2_all_kept.png")
 
 
-# ----------------------------------------------------------------------------- 09-11 exercises
-def fig09():
+# ----------------------------------------------------------------------------- 10-12 exercises
+def fig10():
     pts = ex_a()
     fig, ax = plt.subplots(figsize=(7.6, 6.2))
     ax.scatter([j for i, j in pts], [i for i, j in pts], s=14, color=BLUE, zorder=3)
@@ -223,10 +257,10 @@ def fig09():
     axes_ij(ax, "j", "i")
     ax.set_title(f"Fig. 11.17(a): {len(pts)} iterations, a triangle")
     ax.legend(loc="upper right", fontsize=9, framealpha=0.95)
-    save(fig, "09_ex_a.png")
+    save(fig, "10_ex_a.png")
 
 
-def fig10():
+def fig11():
     pts = ex_b(39)
     fig, ax = plt.subplots(figsize=(7.6, 6.2))
     ax.scatter([j for i, j in pts], [i for i, j in pts], s=14, color=BLUE, zorder=3)
@@ -238,10 +272,10 @@ def fig10():
     axes_ij(ax, "j", "i")
     ax.set_title("Fig. 11.17(b): a diagonal band of width 10 (zoom, i ≤ 39)")
     ax.legend(loc="lower right", fontsize=9, framealpha=0.95)
-    save(fig, "10_ex_b.png")
+    save(fig, "11_ex_b.png")
 
 
-def fig11():
+def fig12():
     pts = ex_c()[::7]
     fig = plt.figure(figsize=(8.2, 6.6))
     ax = fig.add_subplot(111, projection="3d")
@@ -249,11 +283,11 @@ def fig11():
                c=[p[2] for p in pts], cmap="viridis", s=5)
     ax.set_xlabel("i"); ax.set_ylabel("j"); ax.set_zlabel("k")
     ax.set_title("Fig. 11.17(c): 44,200 iterations (every 7th shown)\nk between planes k = i + j and k = 99 − i − j; needs i + j ≤ 49")
-    save(fig, "11_ex_c.png")
+    save(fig, "12_ex_c.png")
 
 
-# ----------------------------------------------------------------------------- 10 anti-diagonals
-def fig12():
+# ----------------------------------------------------------------------------- 13 Ex. 11.3.4(a) Pass 2, 14 anti-diagonals
+def fig13():
     """Exercise 11.3.4(a): Fig. 11.17(a) in the order j, i.  The upper bound i <= 29 never
     touches the shape (the inner loop never gets past i = 18), so Pass 2 drops it."""
     fig, a2 = plt.subplots(figsize=(8.0, 5.4))
@@ -273,10 +307,10 @@ def fig12():
     a2.set_aspect("auto")
     a2.set_title("Ex. 11.3.4(a), order j, i:  i ≤ 29 is implied by the other two\nupper bounds (2i ≤ 37)  ->  Pass 2 drops it", fontsize=10.5)
     a2.legend(loc="upper right", fontsize=8.5, framealpha=0.95)
-    save(fig, "12_pass2_redundant_bound.png")
+    save(fig, "13_pass2_redundant_bound.png")
 
 
-def fig13():
+def fig14():
     pts = ex_a()
     fig, ax = plt.subplots(figsize=(7.6, 7.0))
     ax.scatter([j for i, j in pts], [i for i, j in pts], s=12, color="#c4c4c4", zorder=2)
@@ -288,11 +322,11 @@ def fig13():
     axes_ij(ax, "j", "i")
     ax.set_title("Ex. 11.3.8(a): new outer axis s = i + j\nthe outer loop walks the anti-diagonals")
     ax.legend(loc="upper right", fontsize=8.5, framealpha=0.95)
-    save(fig, "13_ex_a_antidiagonal.png")
+    save(fig, "14_ex_a_antidiagonal.png")
 
 
-# ----------------------------------------------------------------------------- 07 change of axes
-def fig07():
+# ----------------------------------------------------------------------------- 08 change of axes
+def fig08():
     fig, (a1, a2) = plt.subplots(1, 2, figsize=(12.5, 5.2))
     a1.add_patch(Polygon(TRAP, closed=True, facecolor=FILL, edgecolor="none"))
     a1.scatter([j for i, j in P], [i for i, j in P], s=45, color=BLUE, zorder=3)
@@ -313,9 +347,10 @@ def fig07():
     a2.set_xticks(range(0, 8)); a2.set_yticks(range(0, 8))
     axes_ij(a2, "j (inner)", "k = j − i (outer)")
     a2.set_title("new axes (k = j − i, j): same points, a sheared shape")
-    save(fig, "07_change_axes.png")
+    save(fig, "08_change_axes.png")
 
 
 if __name__ == "__main__":
-    for f in (fig01, fig02, fig03, fig04, fig05, fig06, fig07, fig08, fig09, fig10, fig11, fig12, fig13):
+    for f in (fig01, fig02, fig03, fig04, fig05, fig06, fig07, fig08, fig09, fig10, fig11, fig12,
+              fig13, fig14):
         f()

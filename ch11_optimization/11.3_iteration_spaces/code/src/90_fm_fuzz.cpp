@@ -17,7 +17,9 @@ static int regressions() {
   int bad = 0;
   Polyhedron poly; // duplicate upper bound: both used to be dropped
   poly.vars = {"i"};
-  poly.ge0({{"i", 1}}, 0).ge0({{"i", -1}}, 5).ge0({{"i", -1}}, 5);
+  poly.addInequality({{"i", 1}}, 0)
+      .addInequality({{"i", -1}}, 5)
+      .addInequality({{"i", -1}}, 5);
   Bounds bounds = computeBounds(poly, {"i"});
   if (bounds.upper[0].empty()) {
     ++bad;
@@ -25,11 +27,11 @@ static int regressions() {
   }
   Polyhedron poly2; // j <= i and 2j <= 2i+1 are equivalent over Z
   poly2.vars = {"i", "j"};
-  poly2.ge0({{"i", 1}}, 0)
-      .ge0({{"i", -1}}, 5)
-      .ge0({{"j", 1}}, 0)
-      .ge0({{"j", -1}, {"i", 1}}, 0)
-      .ge0({{"j", -2}, {"i", 2}}, 1);
+  poly2.addInequality({{"i", 1}}, 0)
+      .addInequality({{"i", -1}}, 5)
+      .addInequality({{"j", 1}}, 0)
+      .addInequality({{"j", -1}, {"i", 1}}, 0)
+      .addInequality({{"j", -2}, {"i", 2}}, 1);
   Bounds bounds2 = computeBounds(poly2, {"i", "j"});
   if (bounds2.upper[1].empty()) {
     ++bad;
@@ -39,7 +41,7 @@ static int regressions() {
 }
 
 // A row with the given coefficients and constant (the variables have no names
-// here, so ge0 cannot be used).
+// here, so addInequality cannot be used).
 static Constraint row(std::vector<int64_t> a, int64_t c) {
   Constraint r;
   r.a = std::move(a);

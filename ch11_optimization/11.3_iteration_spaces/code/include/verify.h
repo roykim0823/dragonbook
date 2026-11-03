@@ -1,69 +1,21 @@
-// verify.h -- the ground truth. Nothing here is from the book; it is what lets
-// every generated nest in the README be CHECKED rather than trusted:
-//   enumerateBox  lists the integer points of a polyhedron by brute force,
+// verify.h -- generated nest vs ground truth. Nothing here is from the book; it
+// is what lets every generated nest in the guide be CHECKED rather than
+// trusted:
 //   runNest       executes a generated loop nest the way the emitted C would,
-//   compare       checks that the two point sets are the same (no point missed,
-//                 no point visited twice),
+//   compare       checks that its points are the ones enumerateBox found
+//                 (no point missed, no point visited twice),
 //   report        the one-line check used for hand-written loops.
+// enumerateBox itself lives in enumerate.h; this header adds the half that
+// needs the Bounds type of loop_bounds.h.
 #ifndef DRAGONBOOK_CH11_11_3_VERIFY_H
 #define DRAGONBOOK_CH11_11_3_VERIFY_H
 
+#include "enumerate.h"
 #include "loop_bounds.h"
 
 #include <iomanip>
 #include <limits>
-#include <set>
 #include <tuple>
-
-// One integer point: x[m] is the value of variable column m.
-using Point = std::vector<int64_t>;
-
-// The value of  a.x + c  for one row at point x.
-inline int64_t evaluate(const Constraint &row, const Point &x) {
-  int64_t sum = row.c;
-  for (size_t m = 0; m < x.size(); ++m)
-    sum += row.a[m] * x[m];
-  return sum;
-}
-
-// Is x inside the polyhedron? Every row has to come out >= 0.
-inline bool contains(const Polyhedron &poly, const Point &x) {
-  for (const Constraint &row : poly.rows)  // point x is inside if it satisfies every row
-    if (evaluate(row, x) < 0)
-      return false;
-  return true;
-}
-
-// Advance x to the next point of the box [lo, hi]^d, counting like a car's
-// odometer: the last coordinate ticks up; when it passes hi it wraps back to
-// lo and the coordinate before it ticks up instead. Returns false when x was
-// the last point (every coordinate was at hi).
-inline bool nextPointInBox(Point &x, int64_t lo, int64_t hi) {
-  for (int d = (int)x.size() - 1; d >= 0; --d) {
-    if (x[d] < hi) {
-      ++x[d];
-      return true;
-    }
-    x[d] = lo; // this coordinate wraps; carry into the one before it
-  }
-  return false;
-}
-
-// Brute force: every integer point of the box [lo, hi]^d that satisfies all
-// rows. The box is the caller's guess of a region that CONTAINS the
-// polyhedron; any box that does gives the same answer, a box that is too
-// small undercounts. (Program 02 shows how to check the guess: a bigger box
-// must find nothing new.) Cost: (hi - lo + 1)^d membership tests.
-inline std::set<Point> enumerateBox(const Polyhedron &poly, int64_t lo,
-                                    int64_t hi) {
-  std::set<Point> inside;
-  Point x(poly.vars.size(), lo); // start at the corner (lo, lo, ..., lo)
-  do {
-    if (contains(poly, x))
-      inside.insert(x);
-  } while (nextPointInBox(x, lo, hi));
-  return inside;
-}
 
 // The numeric value of one bound row for loop variable v, given the values of
 // the outer variables already stored in x (x[v] itself is ignored). This is

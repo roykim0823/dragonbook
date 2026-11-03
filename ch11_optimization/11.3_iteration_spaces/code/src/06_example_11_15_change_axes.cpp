@@ -9,10 +9,10 @@
 int main() {
   Polyhedron poly; // Fig. 11.10:  for (i=0;i<=5;i++) for (j=i;j<=7;j++)
   poly.vars = {"i", "j"};
-  poly.ge0({{"i", 1}}, 0)            //  i     >= 0     i >= 0
-      .ge0({{"i", -1}}, 5)           // -i + 5 >= 0     i <= 5
-      .ge0({{"i", -1}, {"j", 1}}, 0) // -i + j >= 0     j >= i
-      .ge0({{"j", -1}}, 7);          // -j + 7 >= 0     j <= 7
+  poly.addInequality({{"i", 1}}, 0)            //  i     >= 0     i >= 0
+      .addInequality({{"i", -1}}, 5)           // -i + 5 >= 0     i <= 5
+      .addInequality({{"i", -1}, {"j", 1}}, 0) // -i + j >= 0     j >= i
+      .addInequality({{"j", -1}}, 7);          // -j + 7 >= 0     j <= 7
   const Matrix transform{
       {-1, 1}, {0, 1}}; // (i, j) = transform * (k, j) + offset:  i = j - k
   const std::vector<int64_t> offset{0, 0};

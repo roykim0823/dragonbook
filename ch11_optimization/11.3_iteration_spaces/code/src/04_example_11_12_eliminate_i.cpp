@@ -7,15 +7,18 @@
 //
 //   ./run.sh 4      or      g++ -std=c++17 -O2 -Wall -Wextra -I code/include -o
 //   ex04 code/src/04_example_11_12_eliminate_i.cpp && ./ex04
-#include "verify.h"
+#include "enumerate.h"
+#include "fourier_motzkin.h"
+
+#include <iomanip>
 
 int main() {
   Polyhedron poly; // Fig. 11.10:  for (i=0;i<=5;i++) for (j=i;j<=7;j++)
   poly.vars = {"i", "j"};
-  poly.ge0({{"i", 1}}, 0)            //  i     >= 0     i >= 0
-      .ge0({{"i", -1}}, 5)           // -i + 5 >= 0     i <= 5
-      .ge0({{"i", -1}, {"j", 1}}, 0) // -i + j >= 0     j >= i
-      .ge0({{"j", -1}}, 7);          // -j + 7 >= 0     j <= 7
+  poly.addInequality({{"i", 1}}, 0)            //  i     >= 0     i >= 0
+      .addInequality({{"i", -1}}, 5)           // -i + 5 >= 0     i <= 5
+      .addInequality({{"i", -1}, {"j", 1}}, 0) // -i + j >= 0     j >= i
+      .addInequality({{"j", -1}}, 7);          // -j + 7 >= 0     j <= 7
   std::cout << "Example 11.12: project away i (verbose)\n";
   Polyhedron shadow = eliminate(poly, poly.column("i"), true);
   printRows(shadow, "  result");

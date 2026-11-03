@@ -9,6 +9,21 @@
 //     a[m] > 0   the row is a LOWER bound on x_m   (x_m >= something)
 //     a[m] < 0   the row is an UPPER bound on x_m  (x_m <= something)
 //     a[m] == 0  the row says nothing about x_m
+//
+// What of the book is implemented here:
+//     Constraint, Polyhedron   Eq. (11.1), B x + b >= 0, one row per
+//                              inequality (Sec. 11.3.3, Example 11.8)
+//     normalize()              Algorithm 11.11 step 2: divide the row by the
+//                              common factor of its coefficients. Strengthened
+//                              for integers: the constant is floored as well
+//                              (not in the book; see the guide, "Integers vs.
+//                              rationals" in Sec. 11.3.5)
+//     isConstant()             the test behind Algorithm 11.11 step 3: a row
+//                              with no variable left is "c >= 0", and a false
+//                              one means the polyhedron is empty
+//     signStr .. printRows     printing only, nothing from the book
+// Algorithm 11.11 itself (eliminate) is in fourier_motzkin.h and Algorithm
+// 11.13 (computeBounds, the emitter) in loop_bounds.h.
 #ifndef DRAGONBOOK_CH11_11_3_POLY_H
 #define DRAGONBOOK_CH11_11_3_POLY_H
 
@@ -42,11 +57,12 @@ struct Polyhedron {
   }
 
   // Append the row  sum(coef * var) + c >= 0  and return *this so calls chain.
-  // Example:  poly.ge0({{"i", -1}, {"j", 1}}, 0)  appends  -i + j >= 0.
+  // Example:  addInequality({{"i", -1}, {"j", 1}}, 0)  appends  -i + j >= 0.
   // Every call builds a FRESH row: nothing carries over from one call to the
   // next, so a chain of four calls appends four independent rows.
-  Polyhedron &ge0(std::initializer_list<std::pair<const char *, int64_t>> terms,
-                  int64_t c) {
+  Polyhedron &
+  addInequality(std::initializer_list<std::pair<const char *, int64_t>> terms,
+                int64_t c) {
     Constraint row; // new local row for this call, every coefficient 0
     row.a.assign(vars.size(), 0);
     row.c = c;
@@ -97,14 +113,14 @@ inline std::string signStr(bool firstTerm, int64_t value) {
   return value < 0 ? " - " : " + ";
 }
 
-// Render  a[0]*x_0 + ... + c  as text such as "2*i - j + 5". Column `skip` is
-// left out; boundExpr uses that to leave out the loop variable itself.
+// Render  a[0]*x_0 + ... + c  as text such as "2*i - j + 5". Columns with a
+// zero coefficient are left out (boundExpr relies on that: it zeroes the loop
+// variable's column before printing the rest of the row).
 inline std::string exprStr(const Polyhedron &poly,
-                           const std::vector<int64_t> &a, int64_t c,
-                           int skip = -1) {
+                           const std::vector<int64_t> &a, int64_t c) {
   std::string out;
   for (size_t m = 0; m < a.size(); ++m) {
-    if ((int)m == skip || a[m] == 0)
+    if (a[m] == 0)
       continue; // nothing to print for this column
     out += signStr(out.empty(), a[m]);
     if (std::llabs(a[m]) != 1)

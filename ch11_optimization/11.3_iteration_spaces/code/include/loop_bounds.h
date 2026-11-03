@@ -132,13 +132,13 @@ inline std::string boundExpr(const Polyhedron &poly, const Constraint &row,
     for (int64_t &x : rest)
       x = -x;
     restConstant = -restConstant;
-    std::string text = exprStr(poly, rest, restConstant, v);
+    std::string text = exprStr(poly, rest, restConstant);
     if (coef == 1)
       return text;
     return "ceil_div(" + text + ", " + std::to_string(coef) + ")";
   }
   // upper bound: v <= R / (-coef), rounded down
-  std::string text = exprStr(poly, rest, restConstant, v);
+  std::string text = exprStr(poly, rest, restConstant);
   if (coef == -1)
     return text;
   return "floor_div(" + text + ", " + std::to_string(-coef) + ")";

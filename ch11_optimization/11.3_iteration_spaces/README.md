@@ -87,7 +87,8 @@ This folder is a top-down guide to Dragon Book (2nd ed.) §11.3 with runnable C+
 | `code/include/poly.h` | the data model: `Constraint` (one row), `Polyhedron` (Eq. 11.1), row normalisation, printing |
 | `code/include/fourier_motzkin.h` | Algorithm 11.11: `eliminate()`, plus `infeasible()` / `implied()` built on it |
 | `code/include/loop_bounds.h` | Algorithm 11.13: `computeBounds()` (pass 1 inline, pass 2 in `dropImpliedBounds()`), and the emitter that prints `for` loops |
-| `code/include/verify.h` | `enumerateBox` (brute force), `runNest` (run a generated nest), `compare` (the verdict), and `report` for plain-loop checks |
+| `code/include/enumerate.h` | `enumerateBox`, the brute-force ground truth (needs only poly.h) |
+| `code/include/verify.h` | `runNest` (run a generated nest), `compare` (the verdict against `enumerateBox`), and `report` for plain-loop checks |
 | `code/include/experiment.h` | one complete reorder / change-of-axes experiment, used by programs 05–15 |
 | `code/include/intdiv.h` | `floor_div`/`ceil_div`, shared by everything |
 | `figures/*.png` | plots of the actual iteration spaces (rendered from the real point sets) |

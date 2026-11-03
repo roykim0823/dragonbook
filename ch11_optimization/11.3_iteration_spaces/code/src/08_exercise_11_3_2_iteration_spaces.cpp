@@ -6,32 +6,32 @@
 //
 //   ./run.sh 8      or      g++ -std=c++17 -O2 -Wall -Wextra -I code/include -o
 //   ex08 code/src/08_exercise_11_3_2_iteration_spaces.cpp && ./ex08
-#include "verify.h"
+#include "enumerate.h"
 
 int main() {
   // The three loop nests of Fig. 11.17 as polyhedra ('<' bounds written as
   // '<=' by subtracting 1).
   Polyhedron nestA; // (a) for (i=1;i<30;i++) for (j=i+2;j<40-i;j++)
   nestA.vars = {"i", "j"};
-  nestA.ge0({{"i", 1}}, -1)
-      .ge0({{"i", -1}}, 29)             //  1 <= i <= 29
-      .ge0({{"j", 1}, {"i", -1}}, -2)   //  j - i - 2 >= 0   j >= i + 2
-      .ge0({{"j", -1}, {"i", -1}}, 39); // -j - i + 39 >= 0  j <= 39 - i
+  nestA.addInequality({{"i", 1}}, -1)
+      .addInequality({{"i", -1}}, 29)             //  1 <= i <= 29
+      .addInequality({{"j", 1}, {"i", -1}}, -2)   // j >= i + 2
+      .addInequality({{"j", -1}, {"i", -1}}, 39); // j <= 39 - i
   Polyhedron nestB; // (b) for (i=10;i<=1000;i++) for (j=i;j<i+10;j++)
   nestB.vars = {"i", "j"};
-  nestB.ge0({{"i", 1}}, -10)
-      .ge0({{"i", -1}}, 1000)         // 10 <= i <= 1000
-      .ge0({{"j", 1}, {"i", -1}}, 0)  //  j - i >= 0      j >= i
-      .ge0({{"j", -1}, {"i", 1}}, 9); // -j + i + 9 >= 0  j <= i + 9
+  nestB.addInequality({{"i", 1}}, -10)
+      .addInequality({{"i", -1}}, 1000)         // 10 <= i <= 1000
+      .addInequality({{"j", 1}, {"i", -1}}, 0)  //  j - i >= 0      j >= i
+      .addInequality({{"j", -1}, {"i", 1}}, 9); // -j + i + 9 >= 0  j <= i + 9
   Polyhedron nestC; // (c) for (i=0;i<100;i++) for (j=0;j<100+i;j++)
                     //     for (k=i+j;k<100-i-j;k++)
   nestC.vars = {"i", "j", "k"};
-  nestC.ge0({{"i", 1}}, 0)
-      .ge0({{"i", -1}}, 99) // 0 <= i <= 99
-      .ge0({{"j", 1}}, 0)
-      .ge0({{"j", -1}, {"i", 1}}, 99)              // 0 <= j <= 99 + i
-      .ge0({{"k", 1}, {"i", -1}, {"j", -1}}, 0)    // k >= i + j
-      .ge0({{"k", -1}, {"i", -1}, {"j", -1}}, 99); // k <= 99 - i - j
+  nestC.addInequality({{"i", 1}}, 0)
+      .addInequality({{"i", -1}}, 99) // 0 <= i <= 99
+      .addInequality({{"j", 1}}, 0)
+      .addInequality({{"j", -1}, {"i", 1}}, 99)              // 0 <= j <= 99 + i
+      .addInequality({{"k", 1}, {"i", -1}, {"j", -1}}, 0)    // k >= i + j
+      .addInequality({{"k", -1}, {"i", -1}, {"j", -1}}, 99); // k <= 99 - i - j
 
   long la = 0, lb = 0, lc = 0; // count by running the original nests
   for (long i = 1; i < 30; i++)

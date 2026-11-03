@@ -17,12 +17,12 @@ Everything in this file is about the C++ bundle rather than the book: why the ex
 The headers are quoted one at a time, in the order they include each other:
 
 ```
-    intdiv.h  →  poly.h  →  fourier_motzkin.h  →  loop_bounds.h  →  verify.h  →  experiment.h
-    floor/ceil   rows, print   Algorithm 11.11      Algorithm 11.13    brute force,  one whole
-    division     normalise     eliminate, implied   bounds, emitter    run, verdict  experiment
+    intdiv.h  →  poly.h  →  enumerate.h  →  fourier_motzkin.h  →  loop_bounds.h  →  verify.h  →  experiment.h
+    floor/ceil   rows, print   brute force    Algorithm 11.11      Algorithm 11.13    run nest,     one whole
+    division     normalise     (ground truth) eliminate, implied   bounds, emitter    verdict       experiment
 ```
 
-Every block is the file's text verbatim (two excerpts from inside `eliminate()` are re-indented). Each header says which program uses it first, so this file can be read on its own or opened from the code example that first needs it.
+Every block is one contiguous stretch of the file's text, verbatim (the two excerpts from inside `eliminate()` are re-indented). Each header says which program uses it first, so this file can be read on its own or opened from the code example that first needs it.
 
 ### intdiv.h
 
@@ -39,8 +39,9 @@ template <class A, class B> inline std::common_type_t<A, B> floorDiv(A a, B b) {
   T q = x / y; // quotient truncated toward zero
   T r = x % y; // remainder; it is 0 exactly when the division is exact
   // Truncating and flooring only differ when the division is inexact AND the
-  // exact quotient is negative (x and y have opposite signs). In that case the
-  // truncated quotient is one too large.
+  // exact quotient is negative, i.e. x and y have opposite signs. In C++ the
+  // remainder r has the sign of x, so that is the test on r below. In that
+  // case the truncated quotient is one too large.
   bool inexact = (r != 0);
   bool negativeQuotient = (r < 0) != (y < 0);
   if (inexact && negativeQuotient)
@@ -61,9 +62,9 @@ template <class A, class B> inline std::common_type_t<A, B> ceilDiv(A a, B b) {
 
 First used by program 02 ([§11.3.3](11.3.3_matrix_formulation.md), code example 02), which builds Fig. 11.10 row by row.
 
-The two types every program is built from. A `Constraint` is one row: the coefficient vector `a` (one entry per column of `B`) and the constant `c`. A `Polyhedron` is the list of variable names, which fixes what each column means, plus its rows. `ge0` appends one row from `{variable, coefficient}` pairs and a constant, so a program can write each inequality on its own line; `column` turns a name into its column index and throws on a misspelt name, so a typo cannot silently become a wrong row.
+The two types every program is built from. A `Constraint` is one row: the coefficient vector `a` (one entry per column of `B`) and the constant `c`. A `Polyhedron` is the list of variable names, which fixes what each column means, plus its rows. `addInequality` appends one row from `{variable, coefficient}` pairs and a constant, so a program can write each inequality on its own line; `column` turns a name into its column index and throws on a misspelt name, so a typo cannot silently become a wrong row.
 
-**code/include/poly.h** (`Constraint`, and `Polyhedron` with `column()` and `ge0()`)
+**code/include/poly.h** (`Constraint`, and `Polyhedron` with `column()` and `addInequality()`)
 ```cpp
 struct Constraint {
   std::vector<int64_t> a; // one coefficient per variable (a row of B)
@@ -84,11 +85,12 @@ struct Polyhedron {
   }
 
   // Append the row  sum(coef * var) + c >= 0  and return *this so calls chain.
-  // Example:  poly.ge0({{"i", -1}, {"j", 1}}, 0)  appends  -i + j >= 0.
+  // Example:  addInequality({{"i", -1}, {"j", 1}}, 0)  appends  -i + j >= 0.
   // Every call builds a FRESH row: nothing carries over from one call to the
   // next, so a chain of four calls appends four independent rows.
-  Polyhedron &ge0(std::initializer_list<std::pair<const char *, int64_t>> terms,
-                  int64_t c) {
+  Polyhedron &
+  addInequality(std::initializer_list<std::pair<const char *, int64_t>> terms,
+                int64_t c) {
     Constraint row; // new local row for this call, every coefficient 0
     row.a.assign(vars.size(), 0);
     row.c = c;
@@ -115,14 +117,14 @@ inline std::string signStr(bool firstTerm, int64_t value) {
   return value < 0 ? " - " : " + ";
 }
 
-// Render  a[0]*x_0 + ... + c  as text such as "2*i - j + 5". Column `skip` is
-// left out; boundExpr uses that to leave out the loop variable itself.
+// Render  a[0]*x_0 + ... + c  as text such as "2*i - j + 5". Columns with a
+// zero coefficient are left out (boundExpr relies on that: it zeroes the loop
+// variable's column before printing the rest of the row).
 inline std::string exprStr(const Polyhedron &poly,
-                           const std::vector<int64_t> &a, int64_t c,
-                           int skip = -1) {
+                           const std::vector<int64_t> &a, int64_t c) {
   std::string out;
   for (size_t m = 0; m < a.size(); ++m) {
-    if ((int)m == skip || a[m] == 0)
+    if (a[m] == 0)
       continue; // nothing to print for this column
     out += signStr(out.empty(), a[m]);
     if (std::llabs(a[m]) != 1)
@@ -191,23 +193,93 @@ inline bool isConstant(const Constraint &row) {
 }
 ```
 
+### enumerate.h
+
+First used by program 02 ([§11.3.3](11.3.3_matrix_formulation.md), code example 02). `enumerateBox` is the ground truth that every later verification rests on; it needs only poly.h, which is why it has a header of its own and why programs 02, 03, 04 and 08 can use it without the elimination and loop-bound code. `evaluate` computes `a·x + c` for one row at the point, and `contains` rejects the point at the first row that comes out negative. `nextPointInBox` moves to the next point of the box like a car's odometer: the last coordinate ticks up, and whenever a coordinate passes `hi` it wraps back to `lo` and the coordinate before it ticks up instead; it returns `false` once every coordinate has wrapped, which means every point has been visited. `enumerateBox` starts at `(lo, lo, …)` and simply tests one point per tick; the same `lo` and `hi` apply to every column, so the box is always a cube, and figure 03 in [§11.3.4](11.3.4_symbolic_constants.md) shows one call, the 1681 candidates and the 231 points kept. The cost is `(hi − lo + 1)^d` membership tests, which is fine for the small boxes used here (the largest, the exercise nest Fig. 11.17(c) of §11.3.7, is about ten million points) and is exactly why the box should be generous but not absurd.
+
+**code/include/enumerate.h** (`Point`, `evaluate`, `contains`, `nextPointInBox`, `enumerateBox`: brute force)
+```cpp
+// One integer point: x[m] is the value of variable column m.
+using Point = std::vector<int64_t>;
+
+// The value of  a.x + c  for one row at point x.
+inline int64_t evaluate(const Constraint &row, const Point &x) {
+  int64_t sum = row.c;
+  for (size_t m = 0; m < x.size(); ++m)
+    sum += row.a[m] * x[m];
+  return sum;
+}
+
+// Is x inside the polyhedron? Every row has to come out >= 0.
+inline bool contains(const Polyhedron &poly, const Point &x) {
+  // point x is inside if it satisfies every row
+  for (const Constraint &row : poly.rows)
+    if (evaluate(row, x) < 0)
+      return false;
+  return true;
+}
+
+// Advance x to the next point of the box [lo, hi]^d, counting like a car's
+// odometer: the last coordinate ticks up; when it passes hi it wraps back to
+// lo and the coordinate before it ticks up instead. Returns false when x was
+// the last point (every coordinate was at hi).
+// Example, d = 2, lo = 0, hi = 2, starting from x = (0, 0): successive calls
+// turn x into
+//     (0,1)  (0,2)  (1,0)  (1,1)  (1,2)  (2,0)  (2,1)  (2,2)  then false
+// The step (0,2) -> (1,0) is the wrap: x[1] is at hi, so it goes back to lo
+// and x[0] ticks up. After the last point, x[1] and x[0] both wrap and
+// nothing is left to tick, so the function returns false with x = (0, 0).
+// The order is that of the nested loop  for x[0] in lo..hi, for x[1] in lo..hi.
+inline bool nextPointInBox(Point &x, int64_t lo, int64_t hi) {
+  for (int d = (int)x.size() - 1; d >= 0; --d) {
+    if (x[d] < hi) {
+      ++x[d]; // this coordinate ticks up, no wrap
+      return true;
+    }
+    x[d] = lo; // this coordinate wraps; carry into the one before it
+  }
+  return false;
+}
+
+// Brute force: every integer point of the box [lo, hi]^d that satisfies all
+// rows. The box is the caller's guess of a region that CONTAINS the
+// polyhedron; any box that does gives the same answer, a box that is too
+// small undercounts. (Program 02 shows how to check the guess: a bigger box
+// must find nothing new.) Cost: (hi - lo + 1)^d membership tests.
+inline std::set<Point> enumerateBox(const Polyhedron &poly, int64_t lo,
+                                    int64_t hi) {
+  std::set<Point> inside;
+  Point x(poly.vars.size(), lo); // start at the corner (lo, lo, ..., lo)
+  do {
+    if (contains(poly, x))
+      inside.insert(x);
+  } while (nextPointInBox(x, lo, hi));
+  return inside;
+}
+```
+
 ### fourier_motzkin.h
 
 First used by program 04 ([§11.3.5](11.3.5_controlling_execution_order.md), code example 04). `eliminate()` starts by sorting the rows into three piles by the sign of the coefficient of the variable to eliminate, which is Fact 1 of §11.3.3 in code:
 
 **code/include/fourier_motzkin.h** (inside `eliminate()`)
 ```cpp
-if (row.a[m] > 0)
-  lower.push_back(row);
-else if (row.a[m] < 0)
-  upper.push_back(row);
-else
-  result.rows.push_back(row); // does not mention x_m: keep as is
+// Sort the rows into three piles by the sign of the x_m coefficient: the
+// lower and upper bounds together are the book's C, the third pile is S - C
+// and passes straight through to S' (part of book step 4).
+std::vector<Constraint> lower, upper;
+for (const Constraint &row : poly.rows) {
+  if (row.a[m] > 0)
+    lower.push_back(row);
+  else if (row.a[m] < 0)
+    upper.push_back(row);
+  else
+    result.rows.push_back(row); // does not mention x_m: keep as is
 ```
 
 The two pieces that produce the trace of program 04. `combine()` is book step 1 for one pair, the row sum `c₂·lo + c₁·up` (with `normalize()` as book step 2); the pairing loop in `eliminate()` calls it for every (lower, upper) pair, prints the trace line, and drops a trivially true constant row while keeping a false one so that step 3 can be detected by the caller:
 
-**code/include/fourier_motzkin.h** (`combine()` and the pairing loop of `eliminate()`)
+**code/include/fourier_motzkin.h** (`combine()`: one pair)
 ```cpp
 // Combine one lower bound and one upper bound on x_m into a row without x_m.
 //     lo:   c1*x_m + Lrest >= 0   (c1 > 0)   i.e.   x_m >= -Lrest / c1
@@ -223,10 +295,18 @@ inline Constraint combine(const Constraint &lo, const Constraint &up, int m) {
   for (size_t k = 0; k < sum.a.size(); ++k)
     sum.a[k] = c2 * lo.a[k] + c1 * up.a[k]; // column m becomes 0
   sum.c = c2 * lo.c + c1 * up.c;
-  return normalize(sum); // step 2 of the algorithm: divide out common factors
+  // book step 2: divide out the common factor (normalize also floors the
+  // constant, the integer tightening explained in poly.h)
+  return normalize(sum);
 }
+```
 
-// Step 2: every lower bound paired with every upper bound gives a new row.
+The pairing loop that calls it sits inside `eliminate()`, after the three-pile sort quoted above (re-indented here):
+
+**code/include/fourier_motzkin.h** (inside `eliminate()`: the pairing loop)
+```cpp
+// Book step 1: every lower bound paired with every upper bound gives a new
+// row (combine() also does step 2 on it).
 for (const Constraint &lo : lower) {
   for (const Constraint &up : upper) {
     Constraint combined = combine(lo, up, m);
@@ -239,10 +319,12 @@ for (const Constraint &lo : lower) {
       std::cout << "\n";
     }
     // A row like "5 >= 0" carries no information: drop it. A row like
-    // "-3 >= 0" is kept so that callers can see the polyhedron is empty.
+    // "-3 >= 0" is kept so that callers can see the polyhedron is empty:
+    // book step 3 (unsatisfiable row => S is empty) is left to them,
+    // infeasible() below and computeBounds() in loop_bounds.h.
     if (isConstant(combined) && combined.c >= 0)
       continue;
-    result.rows.push_back(combined);
+    result.rows.push_back(combined); // book step 4: S' = (S - C) + new rows
   }
 }
 ```
@@ -342,26 +424,6 @@ inline Bounds computeBounds(const Polyhedron &poly,
       bounds.empty = true;
       return bounds;
     }
-  }
-
-  // Pass 2 (Fig. 11.15, second loop): outermost -> innermost, drop every bound
-  // that is implied by S' (the outer bounds already kept) together with the
-  // other bounds of the same variable. (The book uses only S'; see the guide.)
-  Polyhedron outerBounds; // S'
-  outerBounds.vars = poly.vars;
-  for (int i = 0; i < n; ++i) {
-    bounds.lower[i] = dropImpliedBounds(poly, outerBounds, bounds.lower[i],
-                                        bounds.upper[i], verbose);
-    bounds.upper[i] = dropImpliedBounds(poly, outerBounds, bounds.upper[i],
-                                        bounds.lower[i], verbose);
-    // the bounds kept for this loop become context for the inner loops
-    for (const Constraint &row : bounds.lower[i])
-      outerBounds.rows.push_back(row);
-    for (const Constraint &row : bounds.upper[i])
-      outerBounds.rows.push_back(row);
-  }
-  return bounds;
-}
 ```
 
 `dropImpliedBounds()` is Pass 2 for one loop and one direction. It differs from Fig. 11.15 in what counts as context (see *Where the tool goes beyond Fig. 11.15* in [§11.3.5](11.3.5_controlling_execution_order.md)): not only `S'` but also the other direction's bounds, the candidates not yet decided, and the candidates already kept, never a candidate already dropped.
@@ -404,9 +466,9 @@ dropImpliedBounds(const Polyhedron &poly, const Polyhedron &outerBounds,
 }
 ```
 
-The rest of `loop_bounds.h` is the emitter, which turns the result of `computeBounds` into the `generated code:` lines of the trace. `computeBounds` returns a `Bounds`: for each loop in the given order, the rows that bound that loop's variable from below and from above. `boundExpr` solves one such row for the loop variable, which is Fact 1 and Fact 2 of §11.3.3 in code: move the other terms across, flip the sign for an upper bound, and wrap in `ceil_div` or `floor_div` when the coefficient is not ±1. `joinMinMax` nests several bounds into `max(a, max(b, c))` or `min(...)`, `loopHeader` puts the two together into the text of one `for (...)` line, and `emit` prints one such line per loop plus the body.
+The rest of `loop_bounds.h` is the emitter, which turns the result of `computeBounds` into the `generated code:` lines of the trace. `computeBounds` returns a `Bounds`: for each loop in the given order, the rows that bound that loop's variable from below and from above. `boundExpr` solves one such row for the loop variable, which is Fact 1 of §11.3.3 in code plus the rounding of *Integers vs. rationals* in §11.3.5: move the other terms across, flip the sign for an upper bound, and wrap in `ceil_div` or `floor_div` when the coefficient is not ±1. `joinMinMax` nests several bounds into `max(a, max(b, c))` or `min(...)`, `loopHeader` puts the two together into the text of one `for (...)` line, and `emit` prints one such line per loop plus the body.
 
-**code/include/loop_bounds.h** (`Bounds`, and the emitter: `boundExpr`, `boundExprs`, `joinMinMax`, `loopHeader`, `printBounds`, `emit`)
+**code/include/loop_bounds.h** (`Bounds`: the result of Algorithm 11.13)
 ```cpp
 // The result of Algorithm 11.13. Loop i (0 = outermost) runs the variable
 // order[i] from max(lower[i]) to min(upper[i]); each entry of lower[i] /
@@ -417,7 +479,12 @@ struct Bounds {
   std::vector<std::vector<Constraint>> lower, upper; // bound rows per loop
   bool empty = false; // the polyhedron has no points: the nest runs 0 times
 };
+```
 
+`computeBounds` and `dropImpliedBounds`, which fill a `Bounds`, are the two quotes above; the emitter follows them in the file.
+
+**code/include/loop_bounds.h** (the emitter: `boundExpr`, `boundExprs`, `joinMinMax`, `loopHeader`, `printBounds`, `emit`)
+```cpp
 // ---------- code emission ----------------------------------------------------
 // Solve one bound row for the loop variable v and print the bound as C text.
 //     lower bound    c1*v + R >= 0  (c1 > 0)   ==>   v >= ceil(-R / c1)
@@ -438,13 +505,13 @@ inline std::string boundExpr(const Polyhedron &poly, const Constraint &row,
     for (int64_t &x : rest)
       x = -x;
     restConstant = -restConstant;
-    std::string text = exprStr(poly, rest, restConstant, v);
+    std::string text = exprStr(poly, rest, restConstant);
     if (coef == 1)
       return text;
     return "ceil_div(" + text + ", " + std::to_string(coef) + ")";
   }
   // upper bound: v <= R / (-coef), rounded down
-  std::string text = exprStr(poly, rest, restConstant, v);
+  std::string text = exprStr(poly, rest, restConstant);
   if (coef == -1)
     return text;
   return "floor_div(" + text + ", " + std::to_string(-coef) + ")";
@@ -509,59 +576,7 @@ inline void emit(const Polyhedron &poly, const Bounds &bounds,
 
 ### verify.h
 
-First used by program 02 ([§11.3.3](11.3.3_matrix_formulation.md), code example 02). `enumerateBox` is the ground truth that every later verification rests on. `evaluate` computes `a·x + c` for one row at the point, and `contains` rejects the point at the first row that comes out negative. `nextPointInBox` moves to the next point of the box like a car's odometer: the last coordinate ticks up, and whenever a coordinate passes `hi` it wraps back to `lo` and the coordinate before it ticks up instead; it returns `false` once every coordinate has wrapped, which means every point has been visited. `enumerateBox` starts at `(lo, lo, …)` and simply tests one point per tick. The cost is `(hi − lo + 1)^d` membership tests, which is fine for the small boxes used here (the largest, the exercise nest Fig. 11.17(c) of §11.3.7, is about ten million points) and is exactly why the box should be generous but not absurd.
-
-**code/include/verify.h** (`evaluate`, `contains`, `nextPointInBox`, `enumerateBox`: brute force)
-```cpp
-// The value of  a.x + c  for one row at point x.
-inline int64_t evaluate(const Constraint &row, const Point &x) {
-  int64_t sum = row.c;
-  for (size_t m = 0; m < x.size(); ++m)
-    sum += row.a[m] * x[m];
-  return sum;
-}
-
-// Is x inside the polyhedron? Every row has to come out >= 0.
-inline bool contains(const Polyhedron &poly, const Point &x) {
-  for (const Constraint &row : poly.rows)  // point x is inside if it satisfies every row
-    if (evaluate(row, x) < 0)
-      return false;
-  return true;
-}
-
-// Advance x to the next point of the box [lo, hi]^d, counting like a car's
-// odometer: the last coordinate ticks up; when it passes hi it wraps back to
-// lo and the coordinate before it ticks up instead. Returns false when x was
-// the last point (every coordinate was at hi).
-inline bool nextPointInBox(Point &x, int64_t lo, int64_t hi) {
-  for (int d = (int)x.size() - 1; d >= 0; --d) {
-    if (x[d] < hi) {
-      ++x[d];
-      return true;
-    }
-    x[d] = lo; // this coordinate wraps; carry into the one before it
-  }
-  return false;
-}
-
-// Brute force: every integer point of the box [lo, hi]^d that satisfies all
-// rows. The box is the caller's guess of a region that CONTAINS the
-// polyhedron; any box that does gives the same answer, a box that is too
-// small undercounts. (Program 02 shows how to check the guess: a bigger box
-// must find nothing new.) Cost: (hi - lo + 1)^d membership tests.
-inline std::set<Point> enumerateBox(const Polyhedron &poly, int64_t lo,
-                                    int64_t hi) {
-  std::set<Point> inside;
-  Point x(poly.vars.size(), lo); // start at the corner (lo, lo, ..., lo)
-  do {
-    if (contains(poly, x))
-      inside.insert(x);
-  } while (nextPointInBox(x, lo, hi));
-  return inside;
-}
-```
-
-The second half of the file runs a generated nest and checks it; first used by program 05. `runNest` is how a generated nest is executed without compiling it. `boundValue` is `boundExpr` evaluated instead of printed: one bound row, at the current values of the outer variables, with the same `ceilDiv`/`floorDiv` rounding the emitted code would use. `runLevel` runs one loop level: take the maximum of the lower-bound values and the minimum of the upper-bound values, and for every value in between recurse one loop inward; when the innermost level is reached the point is recorded. `pointStr` formats one point as `[1,2]`. `compare` is the verdict line in every trace, and `report` is the one-line comparison the plain-loop checks print.
+First used by program 05 ([§11.3.5](11.3.5_controlling_execution_order.md), code example 05). This header runs a generated nest and checks it against the points `enumerateBox` found; it is the half of the checker that needs the `Bounds` type of loop_bounds.h. `runNest` is how a generated nest is executed without compiling it. `boundValue` is `boundExpr` evaluated instead of printed: one bound row, at the current values of the outer variables, with the same `ceilDiv`/`floorDiv` rounding the emitted code would use. `runLevel` runs one loop level: take the maximum of the lower-bound values and the minimum of the upper-bound values, and for every value in between recurse one loop inward; when the innermost level is reached the point is recorded. `pointStr` formats one point as `[1,2]`. `compare` is the verdict line in every trace, and `report` is the one-line comparison the plain-loop checks print.
 
 **code/include/verify.h** (`boundValue`, `runLevel`, `runNest`, `pointStr`, `compare`, `report`: running and checking a generated nest)
 ```cpp
@@ -664,9 +679,11 @@ inline void report(const char *what, const S &ref, const S &got, long nGot) {
 
 ### experiment.h
 
-First used by program 05 ([§11.3.5](11.3.5_controlling_execution_order.md), code example 05). `experiment` is the driver that every reorder and change-of-axes program from here on calls. It does, in order: substitute new axes if asked (`changeAxes`, below), run `computeBounds` in the requested order, print the bounds and the generated nest (`printGeneratedNest`, which also stops early when the polyhedron is empty), then **verify**: `runNest` executes the generated nest exactly as the emitted code would, `mapBack` converts each visited point to the original variables, `enumerateBox` produces the truth, and `compare` checks that the two point sets are equal and that no point was visited twice. The two numbers before the body are the brute-force box, chosen as in program 02.
+First used by program 05 ([§11.3.5](11.3.5_controlling_execution_order.md), code example 05). `experiment` is the driver that every reorder and change-of-axes program from here on calls; `reorder` is the same with the identity substitution filled in, which is what the pure-reorder programs 05 and 10 call. It does, in order: substitute new axes if asked (`changeAxes`, below), run `computeBounds` in the requested order, print the bounds and the generated nest (`printGeneratedNest`, which also stops early when the polyhedron is empty), then **verify**: `runNest` executes the generated nest exactly as the emitted code would, `mapBack` converts each visited point to the original variables, `enumerateBox` produces the truth, and `compare` checks that the two point sets are equal and that no point was visited twice. The two numbers before the body are the brute-force box, chosen as in program 02.
 
-**code/include/experiment.h** (`printGeneratedNest()` and `experiment()`: the driver)
+`experiment` does not take a list of symbolic constants (§11.3.4): a program adds the constant as the first entry of `vars`, puts it first in the `order` argument, and ignores the first loop the emitter prints. The bounds `computeBounds` finds for that "loop" are the conditions under which the nest is non-empty (the `n ≥ 0` of Example 11.9), not a loop to run.
+
+**code/include/experiment.h** (`printGeneratedNest()`, `experiment()` and `reorder()`: the driver)
 ```cpp
 // Print the generated nest. Returns false if the polyhedron turned out empty:
 // then there is nothing to run or verify.
@@ -715,6 +732,20 @@ inline void experiment(const std::string &title, const Polyhedron &poly,
 
   // 4. the verdict: same point set as brute force on the original polyhedron
   compare(title, enumerateBox(poly, lo, hi), visited);
+}
+
+// A pure reorder: the same variables, looped in a different order. This is
+// experiment() with the identity substitution (x = y), which is what programs
+// 05 and 10 do.
+inline void reorder(const std::string &title, const Polyhedron &poly,
+                    const std::vector<std::string> &order, int64_t lo,
+                    int64_t hi, const std::string &body, bool verbose) {
+  size_t d = poly.vars.size();
+  Matrix identity(d, std::vector<int64_t>(d, 0));
+  for (size_t k = 0; k < d; ++k)
+    identity[k][k] = 1;
+  experiment(title, poly, poly.vars, identity, std::vector<int64_t>(d, 0),
+             order, lo, hi, body, verbose);
 }
 ```
 
@@ -843,7 +874,7 @@ for (j = 3; j <= 38; j++)
   first iterations in generated order: [1,3] [1,4] [2,4] [1,5] [2,5] [3,5] [1,6] [2,6] [3,6] [4,6] ...
 ```
 
-To experiment, copy any numbered program (say `10_exercise_11_3_4_reverse_order.cpp`) to a new number and edit its `main()`: build a `Polyhedron` with `.ge0({{"i", 1}, {"j", -1}}, 5)` for `i − j + 5 ≥ 0`, then call `experiment(title, poly, newVars, transform, offset, order, lo, hi, body, verbose)`. `transform` and `offset` express the old variables in terms of the new ones (`x_old = transform·y_new + offset`); pass the identity and a zero vector for a pure reordering. For a change of axes that is *not* unimodular, use `experimentEquality(title, poly, "m", {{"i", 1}, {"j", -2}}, order, lo, hi, body, verbose)` instead: it keeps the old variables, adds `m = i − 2j` as an equality, and lets the determined variable's loop run once or not at all.
+To experiment, copy any numbered program (say `10_exercise_11_3_4_reverse_order.cpp`) to a new number and edit its `main()`: build a `Polyhedron` with `.addInequality({{"i", 1}, {"j", -1}}, 5)` for `i − j + 5 ≥ 0`, then call `experiment(title, poly, newVars, transform, offset, order, lo, hi, body, verbose)`. `transform` and `offset` express the old variables in terms of the new ones (`x_old = transform·y_new + offset`); pass the identity and a zero vector for a pure reordering. For a change of axes that is *not* unimodular, use `experimentEquality(title, poly, "m", {{"i", 1}, {"j", -2}}, order, lo, hi, body, verbose)` instead: it keeps the old variables, adds `m = i − 2j` as an equality, and lets the determined variable's loop run once or not at all.
 
 ## The fuzzer
 
@@ -866,7 +897,9 @@ static int regressions() {
   int bad = 0;
   Polyhedron poly; // duplicate upper bound: both used to be dropped
   poly.vars = {"i"};
-  poly.ge0({{"i", 1}}, 0).ge0({{"i", -1}}, 5).ge0({{"i", -1}}, 5);
+  poly.addInequality({{"i", 1}}, 0)
+      .addInequality({{"i", -1}}, 5)
+      .addInequality({{"i", -1}}, 5);
   Bounds bounds = computeBounds(poly, {"i"});
   if (bounds.upper[0].empty()) {
     ++bad;
@@ -874,11 +907,11 @@ static int regressions() {
   }
   Polyhedron poly2; // j <= i and 2j <= 2i+1 are equivalent over Z
   poly2.vars = {"i", "j"};
-  poly2.ge0({{"i", 1}}, 0)
-      .ge0({{"i", -1}}, 5)
-      .ge0({{"j", 1}}, 0)
-      .ge0({{"j", -1}, {"i", 1}}, 0)
-      .ge0({{"j", -2}, {"i", 2}}, 1);
+  poly2.addInequality({{"i", 1}}, 0)
+      .addInequality({{"i", -1}}, 5)
+      .addInequality({{"j", 1}}, 0)
+      .addInequality({{"j", -1}, {"i", 1}}, 0)
+      .addInequality({{"j", -2}, {"i", 2}}, 1);
   Bounds bounds2 = computeBounds(poly2, {"i", "j"});
   if (bounds2.upper[1].empty()) {
     ++bad;
@@ -888,7 +921,7 @@ static int regressions() {
 }
 
 // A row with the given coefficients and constant (the variables have no names
-// here, so ge0 cannot be used).
+// here, so addInequality cannot be used).
 static Constraint row(std::vector<int64_t> a, int64_t c) {
   Constraint r;
   r.a = std::move(a);

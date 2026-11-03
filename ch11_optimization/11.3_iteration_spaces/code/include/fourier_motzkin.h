@@ -21,7 +21,9 @@ inline Constraint combine(const Constraint &lo, const Constraint &up, int m) {
   for (size_t k = 0; k < sum.a.size(); ++k)
     sum.a[k] = c2 * lo.a[k] + c1 * up.a[k]; // column m becomes 0
   sum.c = c2 * lo.c + c1 * up.c;
-  return normalize(sum); // step 2 of the algorithm: divide out common factors
+  // book step 2: divide out the common factor (normalize also floors the
+  // constant, the integer tightening explained in poly.h)
+  return normalize(sum);
 }
 
 // Project variable column m away (Algorithm 11.11). The result is
@@ -34,7 +36,9 @@ inline Polyhedron eliminate(const Polyhedron &poly, int m,
   Polyhedron result;
   result.vars = poly.vars;
 
-  // Step 1: sort the rows into three piles by the sign of the x_m coefficient.
+  // Sort the rows into three piles by the sign of the x_m coefficient: the
+  // lower and upper bounds together are the book's C, the third pile is S - C
+  // and passes straight through to S' (part of book step 4).
   std::vector<Constraint> lower, upper;
   for (const Constraint &row : poly.rows) {
     if (row.a[m] > 0)
@@ -51,7 +55,8 @@ inline Polyhedron eliminate(const Polyhedron &poly, int m,
               << " new rows\n";
   }
 
-  // Step 2: every lower bound paired with every upper bound gives a new row.
+  // Book step 1: every lower bound paired with every upper bound gives a new
+  // row (combine() also does step 2 on it).
   for (const Constraint &lo : lower) {
     for (const Constraint &up : upper) {
       Constraint combined = combine(lo, up, m);
@@ -64,10 +69,12 @@ inline Polyhedron eliminate(const Polyhedron &poly, int m,
         std::cout << "\n";
       }
       // A row like "5 >= 0" carries no information: drop it. A row like
-      // "-3 >= 0" is kept so that callers can see the polyhedron is empty.
+      // "-3 >= 0" is kept so that callers can see the polyhedron is empty:
+      // book step 3 (unsatisfiable row => S is empty) is left to them,
+      // infeasible() below and computeBounds() in loop_bounds.h.
       if (isConstant(combined) && combined.c >= 0)
         continue;
-      result.rows.push_back(combined);
+      result.rows.push_back(combined); // book step 4: S' = (S - C) + new rows
     }
   }
   return result;

@@ -1,0 +1,27 @@
+# Scratch output of run.sh and CMake in every section folder (see CLAUDE.md:
+# "build/ ... never referenced, safe to delete"): binaries, .log files,
+# CMakeCache.txt, CMakeFiles/, ctest files.
+build/
+
+# Compiler leftovers, including a binary built by the one-line g++ command in a
+# program's top comment (`-o ex02` etc.) if it is run from the section folder.
+*.o
+*.obj
+*.dSYM/
+ex[0-9][0-9]
+
+# Python virtual environments (figures/make_figures.py, pypdf for the book) and
+# bytecode caches.
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# The book itself: ref/ must not be redistributed, so the PDF stays local.
+ref/*.pdf
+
+# Editor and OS noise.
+.DS_Store
+*.swp
+*~
+.idea/
